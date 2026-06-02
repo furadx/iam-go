@@ -1,0 +1,13 @@
+# Server Configuration
+server:
+  mode: release  # debug, release, test
+  addr: :8080
+
+# Database Configuration
+database:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: postgres
+  dbname: iam
+  sslmode: disable
