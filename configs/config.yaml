@@ -20,7 +20,15 @@ database:
 # JWT Configuration
 jwt:
   secret: change-me-in-production   # 生产环境务必改为强随机密钥
-  expire: 86400                     # Token 有效期（秒），默认 24 小时
+  access_expire: 900                # access token 有效期（秒），默认 15 分钟
+  refresh_expire: 604800            # refresh token 有效期（秒），默认 7 天
+  revoke_fail_open: true            # Redis 故障时是否放行（true=保可用，false=保安全）
+
+# Redis Configuration（用于 JWT 吊销）
+redis:
+  addr: localhost:6379
+  password: ""
+  db: 0
 
 # Log Configuration
 log:
