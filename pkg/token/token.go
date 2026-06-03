@@ -5,57 +5,87 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
-// 哨兵错误，供上层（中间件）映射为业务错误码，避免 pkg 反向依赖 internal。
+// 令牌类型。
+const (
+	TypeAccess  = "access"
+	TypeRefresh = "refresh"
+)
+
+// 哨兵错误，供上层映射为业务错误码，避免 pkg 反向依赖 internal。
 var (
-	// ErrInvalidToken 表示 Token 签名无效、格式错误或校验失败。
-	ErrInvalidToken = errors.New("invalid token")
-	// ErrTokenExpired 表示 Token 已过期。
-	ErrTokenExpired = errors.New("token expired")
+	ErrInvalidToken   = errors.New("invalid token")
+	ErrTokenExpired   = errors.New("token expired")
+	ErrWrongTokenType = errors.New("wrong token type")
 )
 
-// Claims 自定义 JWT 声明，携带用户 ID。
+// Claims 自定义 JWT 声明。
 type Claims struct {
-	UserID int64 `json:"uid"`
+	UserID   int64  `json:"uid"`
+	Username string `json:"username"`
+	Type     string `json:"typ"`
 	jwt.RegisteredClaims
 }
 
 // Manager 负责 JWT 的签发与校验。
 type Manager struct {
-	secret []byte
-	expire time.Duration
-	issuer string
+	secret        []byte
+	accessExpire  time.Duration
+	refreshExpire time.Duration
+	issuer        string
 }
 
-// NewManager 创建 Token 管理器。expire 为 Token 有效期。
-func NewManager(secret string, expire time.Duration) *Manager {
+// NewManager 创建 Token 管理器。
+func NewManager(secret string, accessExpire, refreshExpire time.Duration) *Manager {
 	return &Manager{
-		secret: []byte(secret),
-		expire: expire,
-		issuer: "iam-go",
+		secret:        []byte(secret),
+		accessExpire:  accessExpire,
+		refreshExpire: refreshExpire,
+		issuer:        "iam-go",
 	}
 }
 
-// Sign 为指定用户签发一个 HS256 JWT。
-func (m *Manager) Sign(userID int64) (string, error) {
+// AccessExpireSeconds 返回 access token 有效期（秒），用于登录响应 expires_in。
+func (m *Manager) AccessExpireSeconds() int {
+	return int(m.accessExpire.Seconds())
+}
+
+func (m *Manager) sign(uid int64, username, typ string, expire time.Duration) (string, *Claims, error) {
 	now := time.Now()
-	claims := Claims{
-		UserID: userID,
+	claims := &Claims{
+		UserID:   uid,
+		Username: username,
+		Type:     typ,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        uuid.NewString(),
 			Issuer:    m.issuer,
 			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(m.expire)),
+			ExpiresAt: jwt.NewNumericDate(now.Add(expire)),
 		},
 	}
-	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(m.secret)
+	signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(m.secret)
+	if err != nil {
+		return "", nil, err
+	}
+	return signed, claims, nil
 }
 
-// Parse 校验并解析 JWT，返回用户 ID。
-func (m *Manager) Parse(tokenStr string) (int64, error) {
+// SignAccess 签发 access token。
+func (m *Manager) SignAccess(uid int64, username string) (string, *Claims, error) {
+	return m.sign(uid, username, TypeAccess, m.accessExpire)
+}
+
+// SignRefresh 签发 refresh token。
+func (m *Manager) SignRefresh(uid int64, username string) (string, *Claims, error) {
+	return m.sign(uid, username, TypeRefresh, m.refreshExpire)
+}
+
+// Parse 校验签名与过期，返回 claims。
+func (m *Manager) Parse(tokenStr string) (*Claims, error) {
 	var claims Claims
 	tkn, err := jwt.ParseWithClaims(tokenStr, &claims, func(t *jwt.Token) (interface{}, error) {
-		// 只接受 HMAC 签名，防止算法混淆攻击（alg=none / RS256 伪造）。
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrInvalidToken
 		}
@@ -63,12 +93,24 @@ func (m *Manager) Parse(tokenStr string) (int64, error) {
 	})
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {
-			return 0, ErrTokenExpired
+			return nil, ErrTokenExpired
 		}
-		return 0, ErrInvalidToken
+		return nil, ErrInvalidToken
 	}
 	if !tkn.Valid {
-		return 0, ErrInvalidToken
+		return nil, ErrInvalidToken
 	}
-	return claims.UserID, nil
+	return &claims, nil
+}
+
+// ParseTyped 在 Parse 基础上额外校验令牌类型。
+func (m *Manager) ParseTyped(tokenStr, want string) (*Claims, error) {
+	claims, err := m.Parse(tokenStr)
+	if err != nil {
+		return nil, err
+	}
+	if claims.Type != want {
+		return nil, ErrWrongTokenType
+	}
+	return claims, nil
 }
