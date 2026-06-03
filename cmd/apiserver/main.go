@@ -17,16 +17,19 @@ import (
 	"github.com/furadx/iam-go/internal/apiserver"
 	"github.com/furadx/iam-go/internal/apiserver/options"
 	"github.com/furadx/iam-go/internal/apiserver/store/postgres"
+	"github.com/furadx/iam-go/internal/pkg/authz"
+	redispkg "github.com/furadx/iam-go/internal/pkg/redis"
+	"github.com/furadx/iam-go/internal/pkg/revoke"
 	pkglog "github.com/furadx/iam-go/pkg/log"
 	"github.com/furadx/iam-go/pkg/token"
 )
 
 var (
-	configFile string
+	configFile  string
 	showVersion bool
-	Version    = "v0.3.0"
-	BuildDate  = "unknown"
-	GitCommit  = "unknown"
+	Version     = "v0.3.0"
+	BuildDate   = "unknown"
+	GitCommit   = "unknown"
 )
 
 func main() {
@@ -118,14 +121,51 @@ func main() {
 
 	pkglog.Info("数据库初始化成功")
 
-	// 初始化 JWT Token 管理器
+	// 初始化 JWT Token 管理器（双令牌）
 	jwtManager := token.NewManager(
 		completedOpts.JWT.Secret,
-		time.Duration(completedOpts.JWT.Expire)*time.Second,
+		time.Duration(completedOpts.JWT.AccessExpire)*time.Second,
+		time.Duration(completedOpts.JWT.RefreshExpire)*time.Second,
 	)
 
+	// 初始化 Redis 与吊销组件
+	redisClient, err := redispkg.New(
+		completedOpts.Redis.Addr,
+		completedOpts.Redis.Password,
+		completedOpts.Redis.DB,
+	)
+	if err != nil {
+		pkglog.Fatalf("初始化 Redis 失败: %v", err)
+	}
+	revoker := revoke.NewRedisRevoker(redisClient)
+	pkglog.Info("Redis 初始化成功")
+
+	// 初始化 Casbin enforcer（复用 gorm 连接）
+	casbinDBGetter, casbinOK := store.(interface{ DB() (*gorm.DB, error) })
+	if !casbinOK {
+		pkglog.Fatal("store 不支持获取 *gorm.DB，无法初始化 Casbin")
+	}
+	gdb, err := casbinDBGetter.DB()
+	if err != nil {
+		pkglog.Fatalf("获取数据库连接失败: %v", err)
+	}
+	authzManager, err := authz.NewManager(gdb, "configs/rbac_model.conf")
+	if err != nil {
+		pkglog.Fatalf("初始化 Casbin 失败: %v", err)
+	}
+	if err := authzManager.SeedDefaults(); err != nil {
+		pkglog.Fatalf("初始化默认策略失败: %v", err)
+	}
+	pkglog.Info("Casbin 初始化成功")
+
 	// 初始化路由
-	router := apiserver.InitRouter(store, jwtManager)
+	router := apiserver.InitRouter(apiserver.RouterDeps{
+		Store:          store,
+		Token:          jwtManager,
+		Revoker:        revoker,
+		Authz:          authzManager,
+		RevokeFailOpen: completedOpts.JWT.RevokeFailOpen,
+	})
 
 	// 创建 HTTP 服务器
 	srv := apiserver.NewServer(completedOpts.Server.Addr, router)
@@ -133,11 +173,11 @@ func main() {
 	pkglog.Infof("服务器启动在 %s (mode: %s)", completedOpts.Server.Addr, completedOpts.Server.Mode)
 
 	// 优雅关闭
-	run(srv, store)
+	run(srv, store, redisClient)
 }
 
 // run 运行服务器并处理优雅关闭。
-func run(srv *apiserver.Server, store interface{ Close() error }) {
+func run(srv *apiserver.Server, store interface{ Close() error }, redisClient interface{ Close() error }) {
 	// 捕获信号
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -171,6 +211,10 @@ func run(srv *apiserver.Server, store interface{ Close() error }) {
 	// 关闭数据库连接
 	if err := store.Close(); err != nil {
 		pkglog.Errorf("关闭数据库连接失败: %v", err)
+	}
+
+	if err := redisClient.Close(); err != nil {
+		pkglog.Errorf("关闭 Redis 连接失败: %v", err)
 	}
 
 	pkglog.Info("服务器已关闭")
