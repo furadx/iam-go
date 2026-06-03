@@ -16,8 +16,8 @@ func Recovery() gin.HandlerFunc {
 			if r := recover(); r != nil {
 				log.Printf("panic recovered: %v\n%s", r, debug.Stack())
 				c.JSON(http.StatusInternalServerError, gin.H{
-					"code":    code.ErrDatabase,
-					"message": code.Text(code.ErrDatabase),
+					"code":    code.ErrInternal,
+					"message": code.Text(code.ErrInternal),
 				})
 				c.Abort()
 			}

@@ -8,25 +8,25 @@ import (
 
 // LogOptions 日志配置选项。
 type LogOptions struct {
-	Level            string   `json:"level" mapstructure:"level"`
-	Format           string   `json:"format" mapstructure:"format"`
-	EnableColor      bool     `json:"enable_color" mapstructure:"enable_color"`
-	DisableCaller    bool     `json:"disable_caller" mapstructure:"disable_caller"`
+	Level             string   `json:"level" mapstructure:"level"`
+	Format            string   `json:"format" mapstructure:"format"`
+	EnableColor       bool     `json:"enable_color" mapstructure:"enable_color"`
+	DisableCaller     bool     `json:"disable_caller" mapstructure:"disable_caller"`
 	DisableStacktrace bool     `json:"disable_stacktrace" mapstructure:"disable_stacktrace"`
-	OutputPaths      []string `json:"output_paths" mapstructure:"output_paths"`
-	ErrorOutputPaths []string `json:"error_output_paths" mapstructure:"error_output_paths"`
+	OutputPaths       []string `json:"output_paths" mapstructure:"output_paths"`
+	ErrorOutputPaths  []string `json:"error_output_paths" mapstructure:"error_output_paths"`
 }
 
 // NewLogOptions 创建默认的日志选项。
 func NewLogOptions() *LogOptions {
 	return &LogOptions{
-		Level:            "info",
-		Format:           "console",
-		EnableColor:      true,
-		DisableCaller:    false,
+		Level:             "info",
+		Format:            "console",
+		EnableColor:       true,
+		DisableCaller:     false,
 		DisableStacktrace: false,
-		OutputPaths:      []string{"stdout"},
-		ErrorOutputPaths: []string{"stderr"},
+		OutputPaths:       []string{"stdout"},
+		ErrorOutputPaths:  []string{"stderr"},
 	}
 }
 

@@ -8,10 +8,10 @@
 - Go 1.25+
 - PostgreSQL 12+
 
-### 2. 克隆项目
+### 2. 进入项目目录
 
 ```bash
-cd /Users/furad/GolandProjects/iam-go
+cd iam-go
 ```
 
 ### 3. 初始化数据库
@@ -57,7 +57,7 @@ curl -X POST http://localhost:8080/api/v1/users \
   -d '{
     "name": "alice",
     "nickname": "Alice",
-    "password": "password123",
+    "password": "IamGo2026!Aa",
     "email": "alice@example.com",
     "phone": "13800138001"
   }'
@@ -94,10 +94,16 @@ curl http://localhost:8080/api/v1/users/alice
 
 ## 配置修改
 
-编辑 `cmd/apiserver/main.go`，修改数据库连接：
+编辑 `configs/config.yaml`，修改 database 配置：
 
-```go
-dsn := "host=localhost user=postgres password=YOUR_PASSWORD dbname=iam port=5432 sslmode=disable"
+```yaml
+database:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: YOUR_PASSWORD
+  dbname: iam
+  sslmode: disable
 ```
 
 ## 常见问题
@@ -109,7 +115,7 @@ A: 运行 `go mod tidy` 确保所有依赖已安装。
 A: 检查 PostgreSQL 是否运行，数据库是否已创建，连接字符串是否正确。
 
 ### Q: 端口被占用？
-A: 修改 `cmd/apiserver/main.go` 中的 `:8080` 为其他端口。
+A: 修改 `configs/config.yaml` 中的 `server.addr` 为其他端口。
 
 ## 项目结构说明
 

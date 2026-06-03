@@ -37,11 +37,12 @@ func (u *users) Update(ctx context.Context, user *model.User, opts model.UpdateO
 
 // Delete 删除用户。
 func (u *users) Delete(ctx context.Context, username string, opts model.DeleteOptions) error {
+	db := u.db.WithContext(ctx)
 	if opts.Unscoped {
-		u.db = u.db.Unscoped()
+		db = db.Unscoped()
 	}
 
-	err := u.db.Where("name = ?", username).Delete(&model.User{}).Error
+	err := db.Where("name = ?", username).Delete(&model.User{}).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return code.WithCode(code.ErrDatabase, err)
 	}

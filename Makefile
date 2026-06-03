@@ -27,14 +27,14 @@ CMD_DIR=cmd/apiserver
 MAIN_FILE=$(CMD_DIR)/main.go
 
 # 版本信息
-VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "v0.2.0")
+VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "v0.3.0")
 BUILD_DATE=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
 GIT_COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 # 构建标志
 LDFLAGS=-ldflags "-X main.Version=$(VERSION) -X main.BuildDate=$(BUILD_DATE) -X main.GitCommit=$(GIT_COMMIT)"
 
-.PHONY: all build run test lint fmt clean install docker-build help
+.PHONY: all build run test lint fmt fmt.check vet ci clean install docker-build help
 
 ## all: 默认目标 - 格式化、检查、测试、构建
 all: fmt lint test build
@@ -77,6 +77,23 @@ fmt:
 	$(GOFMT) -s -w .
 	@echo "Format complete"
 
+## fmt.check: 只检查格式不改写（CI 门禁用）
+fmt.check:
+	@echo "Checking format..."
+	@unformatted=$$($(GOFMT) -s -l .); \
+	if [ -n "$$unformatted" ]; then \
+		echo "以下文件未通过 gofmt -s，请运行 'make fmt'："; \
+		echo "$$unformatted"; \
+		exit 1; \
+	fi
+	@echo "Format check passed"
+
+## ci: 本地复现 CI 门禁（fmt 检查 / vet / build / test，与 .github/workflows/ci.yml 一致）
+ci: fmt.check vet build
+	@echo "Running tests..."
+	$(GOTEST) ./...
+	@echo "CI gate passed"
+
 ## clean: 清理构建产物
 clean:
 	@echo "Cleaning..."
@@ -100,7 +117,11 @@ install.tools:
 ## docker-build: 构建 Docker 镜像
 docker-build:
 	@echo "Building Docker image..."
-	docker build -t iam-go:$(VERSION) -f build/Dockerfile .
+	docker build \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
+		-t iam-go:$(VERSION) -f build/Dockerfile .
 	@echo "Docker image built: iam-go:$(VERSION)"
 
 ## tidy: 整理依赖
