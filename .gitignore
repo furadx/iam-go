@@ -26,6 +26,8 @@ vendor/
 tmp/
 temp/
 
+.vscode/
+
 # 配置文件（可能包含敏感信息）
 configs/config-local.yaml
 configs/*.local.yaml
