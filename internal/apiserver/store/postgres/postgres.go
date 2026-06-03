@@ -27,6 +27,9 @@ func GetPostgresFactoryOr(dsn string) (store.Factory, error) {
 		var db *gorm.DB
 		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
 			Logger: logger.Default.LogMode(logger.Silent),
+			// 让 gorm 把驱动的唯一约束/外键等错误翻译为 gorm.ErrDuplicatedKey 等通用错误，
+			// 上层用 errors.Is 判断，不再依赖字符串匹配。
+			TranslateError: true,
 		})
 		if err != nil {
 			return
@@ -53,6 +56,14 @@ func GetPostgresFactoryOr(dsn string) (store.Factory, error) {
 
 func (ds *datastore) Users() store.UserStore {
 	return newUsers(ds)
+}
+
+// DB 返回底层的 GORM 数据库实例（用于连接池配置）。
+func (ds *datastore) DB() (*gorm.DB, error) {
+	if ds.db == nil {
+		return nil, fmt.Errorf("database not initialized")
+	}
+	return ds.db, nil
 }
 
 func (ds *datastore) Close() error {

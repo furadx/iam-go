@@ -15,16 +15,19 @@ const (
 	ErrDatabase = 100101
 
 	// Authentication errors.
-	ErrEncrypt         = 100201
-	ErrSignToken       = 100202
-	ErrTokenInvalid    = 100203
-	ErrTokenExpired    = 100204
-	ErrUnauthorized    = 100205
+	ErrEncrypt      = 100201
+	ErrSignToken    = 100202
+	ErrTokenInvalid = 100203
+	ErrTokenExpired = 100204
+	ErrUnauthorized = 100205
 
 	// User errors.
-	ErrUserNotFound     = 110001
-	ErrUserAlreadyExist = 110002
+	ErrUserNotFound      = 110001
+	ErrUserAlreadyExist  = 110002
 	ErrPasswordIncorrect = 110003
+	ErrPasswordTooShort  = 110004
+	ErrPasswordTooWeak   = 110005
+	ErrUserDisabled      = 110006
 )
 
 var msgText = map[int]string{
@@ -40,6 +43,9 @@ var msgText = map[int]string{
 	ErrUserNotFound:      "用户不存在",
 	ErrUserAlreadyExist:  "用户已存在",
 	ErrPasswordIncorrect: "密码错误",
+	ErrPasswordTooShort:  "密码过短（至少 8 位）",
+	ErrPasswordTooWeak:   "密码不符合复杂度要求",
+	ErrUserDisabled:      "用户已被禁用",
 }
 
 // Text returns the text for the code.

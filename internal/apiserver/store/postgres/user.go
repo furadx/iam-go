@@ -19,8 +19,15 @@ func newUsers(ds *datastore) *users {
 }
 
 // Create 创建新用户。
+// 翻译 gorm.ErrDuplicatedKey -> code.ErrUserAlreadyExist，作为业务层预检的并发兜底。
 func (u *users) Create(ctx context.Context, user *model.User, opts model.CreateOptions) error {
-	return u.db.Create(&user).Error
+	if err := u.db.WithContext(ctx).Create(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return code.WithCode(code.ErrUserAlreadyExist, err)
+		}
+		return code.WithCode(code.ErrDatabase, err)
+	}
+	return nil
 }
 
 // Update 更新用户信息。

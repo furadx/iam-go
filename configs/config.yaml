@@ -1,7 +1,9 @@
 # Server Configuration
 server:
-  mode: release  # debug, release, test
+  mode: release      # debug, release, test
   addr: :8080
+  healthz: true
+  middlewares: []
 
 # Database Configuration
 database:
@@ -11,3 +13,18 @@ database:
   password: postgres
   dbname: iam
   sslmode: disable
+  max_open_connections: 100
+  max_idle_connections: 10
+  max_lifetime: 3600  # seconds
+
+# Log Configuration
+log:
+  level: info                    # debug, info, warn, error, fatal
+  format: console                # json, console
+  enable_color: true
+  disable_caller: false
+  disable_stacktrace: false
+  output_paths:
+    - stdout
+  error_output_paths:
+    - stderr

@@ -7,7 +7,7 @@ import (
 	"github.com/furadx/iam-go/internal/pkg/util"
 )
 
-// Get 获取用户详情。
+// Get 获取用户详情。脱敏由 service 层统一处理。
 func (u *UserController) Get(c *gin.Context) {
 	username := c.Param("name")
 
@@ -17,7 +17,5 @@ func (u *UserController) Get(c *gin.Context) {
 		return
 	}
 
-	// 清除密码字段
-	user.Password = ""
 	util.WriteResponse(c, nil, user)
 }
