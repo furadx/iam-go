@@ -34,13 +34,15 @@ type UserSrv interface {
 }
 
 type userService struct {
-	store store.Factory
+	store   store.Factory
+	roles   RoleAssigner
+	revoker SessionRevoker
 }
 
 var _ UserSrv = (*userService)(nil)
 
 func newUsers(srv *service) *userService {
-	return &userService{store: srv.store}
+	return &userService{store: srv.store, roles: srv.roles, revoker: srv.revoker}
 }
 
 // Create 创建用户。
@@ -69,6 +71,11 @@ func (u *userService) Create(ctx context.Context, user *model.User, opts model.C
 
 	if err := u.store.Users().Create(ctx, user, opts); err != nil {
 		return err
+	}
+	if u.roles != nil {
+		if _, err := u.roles.AssignRole(user.Name, "user"); err != nil {
+			log.Warnf("assign default role to %s failed: %s", user.Name, err.Error())
+		}
 	}
 	user.Password = ""
 	return nil
@@ -154,6 +161,11 @@ func (u *userService) ChangePassword(ctx context.Context, username, oldPassword,
 	user.Password = hashed
 	if err := u.store.Users().Update(ctx, user, model.UpdateOptions{}); err != nil {
 		return code.WithCode(code.ErrDatabase, err)
+	}
+	if u.revoker != nil {
+		if err := u.revoker.RevokeAllBefore(ctx, int64(user.ID), time.Now()); err != nil {
+			log.Warnf("revoke sessions after password change failed: %s", err.Error())
+		}
 	}
 	return nil
 }
