@@ -27,7 +27,7 @@ CMD_DIR=cmd/apiserver
 MAIN_FILE=$(CMD_DIR)/main.go
 
 # 版本信息
-VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "v0.2.0")
+VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "v0.3.0")
 BUILD_DATE=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
 GIT_COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
@@ -100,7 +100,11 @@ install.tools:
 ## docker-build: 构建 Docker 镜像
 docker-build:
 	@echo "Building Docker image..."
-	docker build -t iam-go:$(VERSION) -f build/Dockerfile .
+	docker build \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
+		-t iam-go:$(VERSION) -f build/Dockerfile .
 	@echo "Docker image built: iam-go:$(VERSION)"
 
 ## tidy: 整理依赖

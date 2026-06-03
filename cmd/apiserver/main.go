@@ -18,6 +18,7 @@ import (
 	"github.com/furadx/iam-go/internal/apiserver/options"
 	"github.com/furadx/iam-go/internal/apiserver/store/postgres"
 	pkglog "github.com/furadx/iam-go/pkg/log"
+	"github.com/furadx/iam-go/pkg/token"
 )
 
 var (
@@ -117,8 +118,14 @@ func main() {
 
 	pkglog.Info("数据库初始化成功")
 
+	// 初始化 JWT Token 管理器
+	jwtManager := token.NewManager(
+		completedOpts.JWT.Secret,
+		time.Duration(completedOpts.JWT.Expire)*time.Second,
+	)
+
 	// 初始化路由
-	router := apiserver.InitRouter(store)
+	router := apiserver.InitRouter(store, jwtManager)
 
 	// 创建 HTTP 服务器
 	srv := apiserver.NewServer(completedOpts.Server.Addr, router)

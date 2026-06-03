@@ -163,6 +163,40 @@ curl http://localhost:8080/api/v1/users/testuser
 }
 ```
 
+## 认证（JWT）
+
+需要登录态的接口（如 WebSocket）使用 JWT 鉴权，流程如下：
+
+**1. 登录获取 Token：**
+
+```bash
+curl -X POST http://localhost:8080/api/v1/login \
+  -H "Content-Type: application/json" \
+  -d '{"name": "testuser", "password": "your-password"}'
+```
+
+**响应：**
+```json
+{
+  "code": 0,
+  "message": "OK",
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIs...",
+    "user": { "id": 1, "name": "testuser", ... }
+  }
+}
+```
+
+**2. 携带 Token 访问受保护接口：**
+
+```bash
+curl http://localhost:8080/api/v1/ws \
+  -H "Authorization: Bearer <token>"
+```
+
+签名密钥与有效期通过 `configs/config.yaml` 的 `jwt` 段配置（生产环境务必修改 `jwt.secret`）。
+Token 校验逻辑见 `pkg/token`，中间件见 `internal/pkg/middleware/auth.go`。
+
 ## 错误码
 
 | 错误码 | 说明 |
@@ -170,16 +204,36 @@ curl http://localhost:8080/api/v1/users/testuser
 | 0 | 成功 |
 | 100001 | 参数绑定失败 |
 | 100002 | 参数验证失败 |
+| 100003 | 服务器内部错误 |
 | 100101 | 数据库错误 |
+| 100202 | 签发 Token 失败 |
+| 100203 | Token 无效 |
+| 100204 | Token 已过期 |
+| 100205 | 未授权 |
 | 110001 | 用户不存在 |
 | 110002 | 用户已存在 |
+| 110003 | 密码错误 |
+| 110006 | 用户已被禁用 |
 
 ## 配置
 
-修改 `cmd/apiserver/main.go` 中的数据库连接字符串：
+配置通过 `configs/config.yaml` 提供，启动时用 `-c` 指定：
 
-```go
-dsn := "host=localhost user=postgres password=postgres dbname=iam port=5432 sslmode=disable"
+```bash
+go run cmd/apiserver/main.go -c configs/config.yaml
+```
+
+也支持命令行标志覆盖（如 `--db.host`、`--server.addr`、`--log.level`），
+以及 `IAM_` 前缀的环境变量。完整选项见 `internal/apiserver/options/`。
+
+```yaml
+database:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: postgres
+  dbname: iam
+  sslmode: disable
 ```
 
 ## 架构设计

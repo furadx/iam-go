@@ -8,10 +8,10 @@
 - Go 1.25+
 - PostgreSQL 12+
 
-### 2. 克隆项目
+### 2. 进入项目目录
 
 ```bash
-cd /Users/furad/GolandProjects/iam-go
+cd iam-go
 ```
 
 ### 3. 初始化数据库

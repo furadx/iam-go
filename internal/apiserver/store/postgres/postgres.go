@@ -35,14 +35,11 @@ func GetPostgresFactoryOr(dsn string) (store.Factory, error) {
 			return
 		}
 
-		sqlDB, dbErr := db.DB()
-		if dbErr != nil {
+		// 连接池参数由调用方（main）依据配置统一设置，这里不再硬编码默认值。
+		if _, dbErr := db.DB(); dbErr != nil {
 			err = dbErr
 			return
 		}
-
-		sqlDB.SetMaxOpenConns(100)
-		sqlDB.SetMaxIdleConns(10)
 
 		instance = &datastore{db: db}
 	})

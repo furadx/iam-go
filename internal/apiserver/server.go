@@ -2,7 +2,6 @@ package apiserver
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"time"
 )
@@ -26,9 +25,9 @@ func NewServer(addr string, handler http.Handler) *Server {
 	}
 }
 
-// Run 启动服务器。
+// Run 启动服务器，阻塞直到服务器关闭。
+// 生命周期日志由调用方（main）统一打印，这里不重复记录。
 func (s *Server) Run() error {
-	log.Printf("服务启动在 %s", s.Addr)
 	if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return err
 	}
@@ -37,10 +36,5 @@ func (s *Server) Run() error {
 
 // Shutdown 优雅关闭服务器。
 func (s *Server) Shutdown(ctx context.Context) error {
-	log.Println("开始优雅关闭服务器...")
-	if err := s.Server.Shutdown(ctx); err != nil {
-		return err
-	}
-	log.Println("服务器已关闭")
-	return nil
+	return s.Server.Shutdown(ctx)
 }

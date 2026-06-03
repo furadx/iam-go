@@ -10,6 +10,7 @@ const (
 	// Common errors.
 	ErrBind       = 100001
 	ErrValidation = 100002
+	ErrInternal   = 100003
 
 	// Database errors.
 	ErrDatabase = 100101
@@ -34,6 +35,7 @@ var msgText = map[int]string{
 	OK:                   "OK",
 	ErrBind:              "参数绑定失败",
 	ErrValidation:        "参数验证失败",
+	ErrInternal:          "服务器内部错误",
 	ErrDatabase:          "数据库错误",
 	ErrEncrypt:           "加密失败",
 	ErrSignToken:         "签发 Token 失败",
@@ -112,7 +114,8 @@ func Code(err error) int {
 		return e.Code
 	}
 
-	return ErrDatabase
+	// 非本包定义的错误（未携带 code），归为内部错误。
+	return ErrInternal
 }
 
 // Register registers a new error code with message.

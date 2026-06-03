@@ -6,6 +6,8 @@ import (
 	"github.com/furadx/iam-go/internal/apiserver/controller/v1/user"
 	wsctrl "github.com/furadx/iam-go/internal/apiserver/controller/v1/ws"
 	"github.com/furadx/iam-go/internal/apiserver/store"
+	"github.com/furadx/iam-go/internal/pkg/middleware"
+	"github.com/furadx/iam-go/pkg/token"
 	"github.com/furadx/iam-go/pkg/ws"
 )
 
@@ -20,7 +22,7 @@ func init() {
 }
 
 // InitRouter 初始化路由。
-func InitRouter(store store.Factory) *gin.Engine {
+func InitRouter(store store.Factory, tm *token.Manager) *gin.Engine {
 	r := gin.New()
 
 	// 全局中间件
@@ -30,7 +32,7 @@ func InitRouter(store store.Factory) *gin.Engine {
 	r.GET("/healthz", healthCheck)
 
 	// 注册路由
-	installRoutes(r, store)
+	installRoutes(r, store, tm)
 
 	return r
 }
@@ -41,14 +43,17 @@ func healthCheck(c *gin.Context) {
 }
 
 // installRoutes 注册 API 路由。
-func installRoutes(r *gin.Engine, store store.Factory) {
+func installRoutes(r *gin.Engine, store store.Factory, tm *token.Manager) {
 	// 初始化控制器
-	userController := user.NewUserController(store)
+	userController := user.NewUserController(store, tm)
 	wsController := wsctrl.NewController(Hub)
 
 	// v1 API 路由组
 	v1 := r.Group("/api/v1")
 	{
+		// 登录，签发 JWT
+		v1.POST("/login", userController.Login)
+
 		// 用户相关接口
 		users := v1.Group("/users")
 		{
@@ -57,8 +62,8 @@ func installRoutes(r *gin.Engine, store store.Factory) {
 			users.GET("/:name", userController.Get)
 		}
 
-		// WebSocket 连接（需要认证）
-		v1.GET("/ws", wsController.HandleWebSocket)
+		// WebSocket 连接（需要 JWT 认证）
+		v1.GET("/ws", middleware.Auth(tm), wsController.HandleWebSocket)
 	}
 }
 
