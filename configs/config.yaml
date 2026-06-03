@@ -1,6 +1,6 @@
 # Server Configuration
 server:
-  mode: release      # debug, release, test
+  mode: debug        # debug, release, test —— 本地开发用 debug；生产改 release（release 下必须设置强 jwt.secret）
   addr: :8080
   healthz: true
   middlewares: []
@@ -29,6 +29,34 @@ redis:
   addr: localhost:6379
   password: ""
   db: 0
+
+# Security Configuration
+security:
+  rate_limit:
+    enabled: true
+    api_limit: 300
+    api_window_seconds: 60
+    login_ip_limit: 10
+    login_window_seconds: 60
+    fail_open: true
+  login_lock:
+    enabled: true
+    user_max_failures: 5
+    ip_max_failures: 20
+    failure_window_minutes: 15
+    lock_minutes: 15
+  password_policy:
+    min_length: 12
+    max_length: 64
+    min_classes: 3
+    reject_username: true
+    reject_common_passwords: true
+  cors:
+    allowed_origins:
+      - http://localhost:3000
+      - http://localhost:5173
+    allow_credentials: true
+    max_age_seconds: 43200
 
 # Log Configuration
 log:

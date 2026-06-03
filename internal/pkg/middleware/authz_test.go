@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -19,6 +20,7 @@ func newAuthzRouter(e Enforcer, username string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.GET("/api/v1/users", func(c *gin.Context) {
+		c.Set(XRequestIDKey, "rid-test")
 		c.Set(ContextUsernameKey, username)
 		c.Next()
 	}, Authz(e), func(c *gin.Context) {
@@ -44,6 +46,17 @@ func TestAuthzForbidden(t *testing.T) {
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d", w.Code)
+	}
+	var body struct {
+		Code      int    `json:"code"`
+		Message   string `json:"message"`
+		RequestID string `json:"request_id"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("expected JSON body, got %q: %v", w.Body.String(), err)
+	}
+	if body.Code != 110007 || body.Message == "" || body.RequestID != "rid-test" {
+		t.Fatalf("unexpected forbidden body: %#v", body)
 	}
 }
 

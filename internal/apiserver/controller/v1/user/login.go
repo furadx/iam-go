@@ -20,7 +20,7 @@ func (u *UserController) Login(c *gin.Context) {
 		return
 	}
 
-	user, err := u.srv.Users().Login(c, r.Name, r.Password)
+	user, err := u.srv.Users().Login(c, r.Name, r.Password, c.ClientIP())
 	if err != nil {
 		util.WriteResponse(c, err, nil)
 		return

@@ -62,15 +62,18 @@ func (m *Manager) RolesForUser(user string) ([]string, error) {
 	return m.enforcer.GetRolesForUser(user)
 }
 
-// SeedDefaults 若无任何策略，写入默认 admin 全通配策略。
+// SeedDefaults 写入默认 admin 策略，并确保初始化用户 admin 具备 admin 角色。
 func (m *Manager) SeedDefaults() error {
 	policies, err := m.enforcer.GetPolicy()
 	if err != nil {
 		return err
 	}
 	if len(policies) == 0 {
-		_, err = m.enforcer.AddPolicy("admin", "/api/v1/*", "*")
-		return err
+		if _, err := m.enforcer.AddPolicy("admin", "/api/v1/*", "*"); err != nil {
+			return err
+		}
 	}
-	return nil
+
+	_, err = m.enforcer.AddGroupingPolicy("admin", "admin")
+	return err
 }

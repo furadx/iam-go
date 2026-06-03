@@ -6,6 +6,12 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// insecureDefaultSecret 是开发用默认密钥，生产（release）模式禁止使用。
+const insecureDefaultSecret = "change-me-in-production"
+
+// minProductionSecretLen 是生产模式下 JWT 密钥的最小长度（字节）。
+const minProductionSecretLen = 32
+
 // JWTOptions JWT 配置选项。
 type JWTOptions struct {
 	Secret         string `json:"-" mapstructure:"secret"`
@@ -38,6 +44,20 @@ func (o *JWTOptions) Validate() []error {
 	}
 	if o.RefreshExpire < o.AccessExpire {
 		errs = append(errs, fmt.Errorf("jwt refresh_expire should be >= access_expire"))
+	}
+	return errs
+}
+
+// ValidateForMode 在基础校验外，按运行模式做密钥强度校验：
+// release（生产）模式禁止默认密钥并要求最小长度，避免用公开密钥签发可被伪造的令牌。
+func (o *JWTOptions) ValidateForMode(mode string) []error {
+	errs := o.Validate()
+	if mode == "release" {
+		if o.Secret == insecureDefaultSecret {
+			errs = append(errs, fmt.Errorf("jwt secret must not use the insecure default in release mode"))
+		} else if len(o.Secret) < minProductionSecretLen {
+			errs = append(errs, fmt.Errorf("jwt secret must be at least %d bytes in release mode", minProductionSecretLen))
+		}
 	}
 	return errs
 }

@@ -11,6 +11,7 @@ type Options struct {
 	Log      *LogOptions      `json:"log" mapstructure:"log"`
 	JWT      *JWTOptions      `json:"jwt" mapstructure:"jwt"`
 	Redis    *RedisOptions    `json:"redis" mapstructure:"redis"`
+	Security *SecurityOptions `json:"security" mapstructure:"security"`
 }
 
 // NewOptions 创建默认选项。
@@ -21,6 +22,7 @@ func NewOptions() *Options {
 		Log:      NewLogOptions(),
 		JWT:      NewJWTOptions(),
 		Redis:    NewRedisOptions(),
+		Security: NewSecurityOptions(),
 	}
 }
 
@@ -31,8 +33,9 @@ func (o *Options) Validate() []error {
 	errs = append(errs, o.Server.Validate()...)
 	errs = append(errs, o.Database.Validate()...)
 	errs = append(errs, o.Log.Validate()...)
-	errs = append(errs, o.JWT.Validate()...)
+	errs = append(errs, o.JWT.ValidateForMode(o.Server.Mode)...)
 	errs = append(errs, o.Redis.Validate()...)
+	errs = append(errs, o.Security.Validate()...)
 
 	return errs
 }
@@ -44,6 +47,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	o.Log.AddFlags(fs)
 	o.JWT.AddFlags(fs)
 	o.Redis.AddFlags(fs)
+	o.Security.AddFlags(fs)
 }
 
 // Complete 填充默认值和派生字段。

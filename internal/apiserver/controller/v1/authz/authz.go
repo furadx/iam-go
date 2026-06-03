@@ -10,7 +10,16 @@ import (
 
 // Controller 角色/策略管理控制器（仅 admin 可达，由路由 Authz 中间件保证）。
 type Controller struct {
-	m *authzpkg.Manager
+	m manager
+}
+
+type manager interface {
+	AddPolicy(role, obj, act string) (bool, error)
+	RemovePolicy(role, obj, act string) (bool, error)
+	Policies() ([][]string, error)
+	AssignRole(user, role string) (bool, error)
+	RevokeRole(user, role string) (bool, error)
+	RolesForUser(user string) ([]string, error)
 }
 
 // NewController 创建控制器。
@@ -31,11 +40,12 @@ func (ctl *Controller) AddPolicy(c *gin.Context) {
 		util.WriteResponse(c, code.WithCode(code.ErrBind, err), nil)
 		return
 	}
-	if _, err := ctl.m.AddPolicy(r.Role, r.Path, r.Method); err != nil {
+	added, err := ctl.m.AddPolicy(r.Role, r.Path, r.Method)
+	if err != nil {
 		util.WriteResponse(c, code.WithCode(code.ErrInternal, err), nil)
 		return
 	}
-	util.WriteResponse(c, nil, gin.H{"added": r})
+	util.WriteResponse(c, nil, gin.H{"added": added, "policy": r})
 }
 
 // RemovePolicy 删除权限策略。
@@ -45,11 +55,12 @@ func (ctl *Controller) RemovePolicy(c *gin.Context) {
 		util.WriteResponse(c, code.WithCode(code.ErrBind, err), nil)
 		return
 	}
-	if _, err := ctl.m.RemovePolicy(r.Role, r.Path, r.Method); err != nil {
+	removed, err := ctl.m.RemovePolicy(r.Role, r.Path, r.Method)
+	if err != nil {
 		util.WriteResponse(c, code.WithCode(code.ErrInternal, err), nil)
 		return
 	}
-	util.WriteResponse(c, nil, gin.H{"removed": r})
+	util.WriteResponse(c, nil, gin.H{"removed": removed, "policy": r})
 }
 
 // ListPolicies 列出全部权限策略。
@@ -74,22 +85,24 @@ func (ctl *Controller) AssignRole(c *gin.Context) {
 		util.WriteResponse(c, code.WithCode(code.ErrBind, err), nil)
 		return
 	}
-	if _, err := ctl.m.AssignRole(name, r.Role); err != nil {
+	assigned, err := ctl.m.AssignRole(name, r.Role)
+	if err != nil {
 		util.WriteResponse(c, code.WithCode(code.ErrInternal, err), nil)
 		return
 	}
-	util.WriteResponse(c, nil, gin.H{"user": name, "role": r.Role})
+	util.WriteResponse(c, nil, gin.H{"user": name, "role": r.Role, "assigned": assigned})
 }
 
 // RevokeRole 撤销用户角色。
 func (ctl *Controller) RevokeRole(c *gin.Context) {
 	name := c.Param("name")
 	role := c.Param("role")
-	if _, err := ctl.m.RevokeRole(name, role); err != nil {
+	revoked, err := ctl.m.RevokeRole(name, role)
+	if err != nil {
 		util.WriteResponse(c, code.WithCode(code.ErrInternal, err), nil)
 		return
 	}
-	util.WriteResponse(c, nil, gin.H{"user": name, "revoked": role})
+	util.WriteResponse(c, nil, gin.H{"user": name, "role": role, "revoked": revoked})
 }
 
 // ListRoles 查询用户角色。

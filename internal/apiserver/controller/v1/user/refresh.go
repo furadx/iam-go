@@ -31,11 +31,17 @@ func (u *UserController) Refresh(c *gin.Context) {
 	if allowed, aerr := u.rv.Allowed(c.Request.Context(), claims); aerr == nil && !allowed {
 		util.WriteResponse(c, code.New(code.ErrRefreshTokenInvalid), nil)
 		return
+	} else if aerr != nil {
+		util.WriteResponse(c, code.WithCode(code.ErrInternal, aerr), nil)
+		return
 	}
 
 	// 轮转：旧 refresh 拉黑（剩余寿命为 TTL）
 	if claims.ExpiresAt != nil {
-		_ = u.rv.Revoke(c.Request.Context(), claims.ID, time.Until(claims.ExpiresAt.Time))
+		if err := u.rv.Revoke(c.Request.Context(), claims.ID, time.Until(claims.ExpiresAt.Time)); err != nil {
+			util.WriteResponse(c, code.WithCode(code.ErrInternal, err), nil)
+			return
+		}
 	}
 
 	access, _, err := u.tm.SignAccess(claims.UserID, claims.Username)

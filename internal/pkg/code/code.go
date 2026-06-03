@@ -8,9 +8,10 @@ const (
 	OK = 0
 
 	// Common errors.
-	ErrBind       = 100001
-	ErrValidation = 100002
-	ErrInternal   = 100003
+	ErrBind            = 100001
+	ErrValidation      = 100002
+	ErrInternal        = 100003
+	ErrTooManyRequests = 100004
 
 	// Database errors.
 	ErrDatabase = 100101
@@ -23,6 +24,7 @@ const (
 	ErrUnauthorized        = 100205
 	ErrTokenTypeInvalid    = 100206
 	ErrRefreshTokenInvalid = 100207
+	ErrLoginLocked         = 100208
 
 	// User errors.
 	ErrUserNotFound      = 110001
@@ -39,6 +41,7 @@ var msgText = map[int]string{
 	ErrBind:                "参数绑定失败",
 	ErrValidation:          "参数验证失败",
 	ErrInternal:            "服务器内部错误",
+	ErrTooManyRequests:     "请求过于频繁，请稍后再试",
 	ErrDatabase:            "数据库错误",
 	ErrEncrypt:             "加密失败",
 	ErrSignToken:           "签发 Token 失败",
@@ -53,6 +56,7 @@ var msgText = map[int]string{
 	ErrUserDisabled:        "用户已被禁用",
 	ErrTokenTypeInvalid:    "Token 类型错误",
 	ErrRefreshTokenInvalid: "RefreshToken 无效",
+	ErrLoginLocked:         "登录失败次数过多，请稍后再试",
 	ErrPermissionDenied:    "权限不足",
 }
 

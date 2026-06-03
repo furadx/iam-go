@@ -34,7 +34,7 @@ GIT_COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 # 构建标志
 LDFLAGS=-ldflags "-X main.Version=$(VERSION) -X main.BuildDate=$(BUILD_DATE) -X main.GitCommit=$(GIT_COMMIT)"
 
-.PHONY: all build run test lint fmt clean install docker-build help
+.PHONY: all build run test lint fmt fmt.check vet ci clean install docker-build help
 
 ## all: 默认目标 - 格式化、检查、测试、构建
 all: fmt lint test build
@@ -76,6 +76,23 @@ fmt:
 	@echo "Formatting code..."
 	$(GOFMT) -s -w .
 	@echo "Format complete"
+
+## fmt.check: 只检查格式不改写（CI 门禁用）
+fmt.check:
+	@echo "Checking format..."
+	@unformatted=$$($(GOFMT) -s -l .); \
+	if [ -n "$$unformatted" ]; then \
+		echo "以下文件未通过 gofmt -s，请运行 'make fmt'："; \
+		echo "$$unformatted"; \
+		exit 1; \
+	fi
+	@echo "Format check passed"
+
+## ci: 本地复现 CI 门禁（fmt 检查 / vet / build / test，与 .github/workflows/ci.yml 一致）
+ci: fmt.check vet build
+	@echo "Running tests..."
+	$(GOTEST) ./...
+	@echo "CI gate passed"
 
 ## clean: 清理构建产物
 clean:

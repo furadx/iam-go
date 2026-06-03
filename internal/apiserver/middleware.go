@@ -8,7 +8,7 @@ import (
 )
 
 // installMiddleware 安装全局中间件。
-func installMiddleware(r *gin.Engine) {
+func installMiddleware(r *gin.Engine, cors middleware.CORSConfig) {
 	// RequestID 中间件 - 请求追踪
 	r.Use(middleware.RequestID())
 
@@ -19,7 +19,7 @@ func installMiddleware(r *gin.Engine) {
 	r.Use(middleware.Recovery())
 
 	// CORS 中间件 - 跨域支持
-	r.Use(middleware.CORS())
+	r.Use(middleware.CORS(cors))
 
 	// 可以在这里添加更多中间件：
 	// r.Use(middleware.RateLimit())

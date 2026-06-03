@@ -1,288 +1,189 @@
 # IAM-Go
 
-一个基于 Go 的 IAM（Identity and Access Management）框架，参考 [marmotedu/iam](https://github.com/marmotedu/iam) 项目架构设计。
+一个基于 Go + Gin 的身份认证与权限管理（IAM）服务底座，开箱即用，适合作为后端项目的二次开发起点。
 
-## 特性
+> 版本：**v1.0.0** ｜ 变更记录见 [CHANGELOG.md](CHANGELOG.md) ｜ 版本策略见 [docs/VERSIONING.md](docs/VERSIONING.md)
 
-- 🏗️ **标准项目结构** - 遵循 Go 项目最佳实践
-- 🔐 **用户管理** - 完整的用户 CRUD 操作
-- 📦 **分层架构** - Controller -> Service -> Store 清晰分层
-- 🗄️ **数据存储** - 基于 GORM 的 PostgreSQL 存储
-- 🛡️ **密码加密** - bcrypt 加密存储
-- 🚀 **Gin 框架** - 高性能 HTTP 路由
+## 这个项目能做什么
 
-## 项目结构
+- **登录认证**：JWT 双令牌（access + refresh），支持令牌刷新与登出吊销
+- **权限控制**：基于 Casbin 的 RBAC（角色—权限），接口级（路径 + 方法）鉴权，策略存数据库、运行时可改
+- **安全加固**：登录失败锁定、接口限流、密码强度策略、CORS 白名单、bcrypt 加密
+- **用户管理**：注册、查询、列表、删除
+- **工程规范**：分层清晰、错误码统一、配置可校验、CI 质量门禁
 
-```
-iam-go/
-├── cmd/
-│   └── apiserver/        # API 服务器入口
-│       └── main.go
-├── internal/
-│   ├── apiserver/
-│   │   ├── controller/   # 控制器层
-│   │   │   └── v1/
-│   │   │       └── user/ # 用户控制器
-│   │   ├── service/      # 业务逻辑层
-│   │   │   └── v1/
-│   │   ├── store/        # 存储层接口
-│   │   │   └── postgres/ # PostgreSQL 实现
-│   │   └── model/        # 数据模型
-│   └── pkg/              # 内部公共库
-│       ├── code/         # 错误码
-│       ├── middleware/   # 中间件
-│       └── util/         # 工具函数
-├── pkg/                  # 可导出的公共库
-│   ├── auth/            # 认证工具
-│   └── log/             # 日志工具
-└── scripts/             # 脚本
-    └── init.sql         # 数据库初始化
-```
+一句话：**认证授权这块最难啃的骨头已经做完且有测试，你可以专注写业务。**
+
+## 技术栈
+
+| 能力 | 选型 |
+|------|------|
+| Web 框架 | Gin |
+| 数据库 | PostgreSQL（GORM） |
+| 缓存/吊销 | Redis |
+| 授权 | Casbin RBAC |
+| 认证 | JWT（HS256，双令牌） |
+| 密码 | bcrypt |
 
 ## 快速开始
 
 ### 1. 环境准备
 
-确保已安装：
 - Go 1.25+
 - PostgreSQL 12+
+- Redis 6+
 
-### 2. 数据库初始化
+### 2. 初始化数据库
 
 ```bash
-# 创建数据库
 createdb iam
-
-# 初始化表结构
 psql -U postgres -d iam -f scripts/init.sql
 ```
 
-### 3. 运行服务
+> `casbin_rule` 权限表由程序启动时自动创建，无需手工建表。
 
-```bash
-# 安装依赖
-go mod tidy
+### 3. 配置
 
-# 运行服务
-go run cmd/apiserver/main.go
-```
-
-服务将启动在 `http://localhost:8080`
-
-### 4. 测试 API
-
-**创建用户：**
-
-```bash
-curl -X POST http://localhost:8080/api/v1/users \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "testuser",
-    "nickname": "测试用户",
-    "password": "123456",
-    "email": "test@example.com",
-    "phone": "13900139000"
-  }'
-```
-
-**获取用户列表：**
-
-```bash
-curl http://localhost:8080/api/v1/users
-```
-
-**获取用户详情：**
-
-```bash
-curl http://localhost:8080/api/v1/users/testuser
-```
-
-## API 文档
-
-### 用户接口
-
-#### POST /api/v1/users - 创建用户
-
-**请求体：**
-```json
-{
-  "name": "username",      // 必填，唯一
-  "nickname": "昵称",
-  "password": "password",  // 必填
-  "email": "email@example.com",  // 必填
-  "phone": "13800138000"
-}
-```
-
-**响应：**
-```json
-{
-  "code": 0,
-  "message": "OK",
-  "data": {
-    "id": 1,
-    "name": "username",
-    "nickname": "昵称",
-    "email": "email@example.com",
-    "createdAt": "2026-06-02T10:00:00Z"
-  }
-}
-```
-
-#### GET /api/v1/users - 获取用户列表
-
-**查询参数：**
-- `offset` - 偏移量
-- `limit` - 每页数量（默认 20）
-- `name` - 用户名模糊搜索
-
-**响应：**
-```json
-{
-  "code": 0,
-  "message": "OK",
-  "data": {
-    "totalCount": 10,
-    "items": [...]
-  }
-}
-```
-
-#### GET /api/v1/users/:name - 获取用户详情
-
-**响应：**
-```json
-{
-  "code": 0,
-  "message": "OK",
-  "data": {
-    "id": 1,
-    "name": "username",
-    ...
-  }
-}
-```
-
-## 认证与授权
-
-### JWT 双令牌
-
-**登录**（公开）：
-```bash
-curl -X POST http://localhost:8080/api/v1/login \
-  -H "Content-Type: application/json" \
-  -d '{"name":"alice","password":"your-password"}'
-# 返回 { access_token, refresh_token, expires_in, user }
-```
-
-**访问受保护接口**：请求头带 `Authorization: Bearer <access_token>`。
-
-**刷新**（access 过期后用 refresh 换新，旧 refresh 失效）：
-```bash
-curl -X POST http://localhost:8080/api/v1/refresh \
-  -H "Content-Type: application/json" \
-  -d '{"refresh_token":"<refresh_token>"}'
-```
-
-**登出**（吊销当前令牌，需登录）：
-```bash
-curl -X POST http://localhost:8080/api/v1/logout \
-  -H "Authorization: Bearer <access_token>" \
-  -d '{"refresh_token":"<refresh_token>"}'
-```
-
-吊销基于 Redis（`redis` 配置段）。`jwt.revoke_fail_open=true` 时 Redis 故障会放行并记日志。
-Token 校验见 `pkg/token`，认证中间件见 `internal/pkg/middleware/auth.go`。
-
-### RBAC（Casbin）
-
-API 级鉴权：策略 `(角色, 路径, 方法)`，分组 `(用户, 角色)`，存于 Postgres 的 `casbin_rule` 表。
-启动时默认 seed 一条 `admin → /api/v1/* → *`，新用户自动获得 `user` 角色。
-
-**设首个管理员**（注册后执行一次）：
-```sql
-INSERT INTO casbin_rule (ptype, v0, v1) VALUES ('g', 'alice', 'admin');
-```
-
-**管理接口**（仅 admin）：
-```bash
-# 增加策略
-curl -X POST http://localhost:8080/api/v1/authz/policies \
-  -H "Authorization: Bearer <admin-access>" \
-  -d '{"role":"editor","path":"/api/v1/users","method":"GET"}'
-
-# 给用户分配角色
-curl -X POST http://localhost:8080/api/v1/users/bob/roles \
-  -H "Authorization: Bearer <admin-access>" \
-  -d '{"role":"editor"}'
-```
-
-## 错误码
-
-| 错误码 | 说明 |
-|--------|------|
-| 0 | 成功 |
-| 100001 | 参数绑定失败 |
-| 100002 | 参数验证失败 |
-| 100003 | 服务器内部错误 |
-| 100101 | 数据库错误 |
-| 100202 | 签发 Token 失败 |
-| 100203 | Token 无效 |
-| 100204 | Token 已过期 |
-| 100205 | 未授权 |
-| 100206 | Token 类型错误 |
-| 100207 | RefreshToken 无效 |
-| 110001 | 用户不存在 |
-| 110002 | 用户已存在 |
-| 110003 | 密码错误 |
-| 110006 | 用户已被禁用 |
-| 110007 | 权限不足 |
-
-## 配置
-
-配置通过 `configs/config.yaml` 提供，启动时用 `-c` 指定：
-
-```bash
-go run cmd/apiserver/main.go -c configs/config.yaml
-```
-
-也支持命令行标志覆盖（如 `--db.host`、`--server.addr`、`--log.level`），
-以及 `IAM_` 前缀的环境变量。完整选项见 `internal/apiserver/options/`。
+编辑 `configs/config.yaml`，至少确认数据库、Redis 与 JWT 密钥：
 
 ```yaml
+server:
+  mode: debug            # 本地开发用 debug；生产用 release
 database:
   host: localhost
   port: 5432
   user: postgres
   password: postgres
   dbname: iam
-  sslmode: disable
+redis:
+  addr: localhost:6379
+jwt:
+  secret: change-me-in-production   # 生产(release)模式必须改成 >=32 字节的强密钥，否则拒绝启动
 ```
 
-## 架构设计
+### 4. 启动
 
-### 分层架构
-
-```
-Controller (处理 HTTP 请求)
-    ↓
-Service (业务逻辑)
-    ↓
-Store (数据访问)
-    ↓
-Database (PostgreSQL)
+```bash
+go run cmd/apiserver/main.go -c configs/config.yaml
 ```
 
-### 设计模式
+服务启动在 `http://localhost:8080`。
 
-- **工厂模式** - Store Factory 管理存储层
-- **依赖注入** - Controller 依赖 Service，Service 依赖 Store
-- **接口抽象** - 所有层都定义接口，便于测试和扩展
+## 认证与鉴权怎么用
 
-## 参考项目
+```text
+1. 注册 / 登录 → 拿到 access_token + refresh_token
+2. 访问受保护接口时带上 Authorization: Bearer <access_token>
+3. access_token 过期 → 用 refresh_token 换新的一对
+4. 登出 → 令牌被吊销，立即失效
+```
 
-- [marmotedu/iam](https://github.com/marmotedu/iam) - IAM 系统设计参考
+**注册并登录：**
+
+```bash
+# 注册（公开）
+curl -X POST http://localhost:8080/api/v1/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"alice","password":"IamGo2026!Aa","email":"alice@example.com"}'
+
+# 登录，拿令牌
+curl -X POST http://localhost:8080/api/v1/login \
+  -H "Content-Type: application/json" \
+  -d '{"name":"alice","password":"IamGo2026!Aa"}'
+```
+
+登录响应：
+
+```json
+{
+  "code": 0,
+  "message": "OK",
+  "data": {
+    "access_token": "xxx",
+    "refresh_token": "yyy",
+    "expires_in": 900
+  }
+}
+```
+
+**访问受保护接口：**
+
+```bash
+curl http://localhost:8080/api/v1/users \
+  -H "Authorization: Bearer <access_token>"
+```
+
+> 注意：登录成功只代表"你是谁"。能不能访问某个接口由 Casbin 决定。新注册用户默认是 `user` 角色，默认没有任何接口权限；`admin` 角色默认拥有 `/api/v1/*` 全部权限。权限分配见下方接口表。
+
+## 接口一览
+
+| 方法 | 路径 | 鉴权 | 说明 |
+|------|------|------|------|
+| POST | `/api/v1/users` | 公开 | 注册 |
+| POST | `/api/v1/login` | 公开 | 登录，返回双令牌 |
+| POST | `/api/v1/refresh` | 公开（带 refresh） | 刷新令牌（旧 refresh 作废） |
+| POST | `/api/v1/logout` | 需登录 | 登出，吊销令牌 |
+| GET | `/api/v1/users` | 需授权 | 用户列表 |
+| GET | `/api/v1/users/:name` | 需授权 | 用户详情 |
+| DELETE | `/api/v1/users/:name` | 需授权 | 删除用户 |
+| GET/POST/DELETE | `/api/v1/users/:name/roles` | 需授权 | 查询/分配/撤销用户角色 |
+| GET/POST/DELETE | `/api/v1/authz/policies` | 需授权 | 查询/新增/删除权限策略 |
+
+所有业务接口统一返回 `{ code, message, data, request_id }`，`code=0` 表示成功。
+
+## 开发
+
+```bash
+make ci          # 本地复现 CI 门禁：gofmt 检查 + go vet + build + test
+make test        # 跑测试（带竞态检测）
+make fmt         # 格式化代码
+make build       # 编译二进制
+```
+
+提交前请确保 `make ci` 通过——CI 会在 PR 上执行同样的四道门禁。
+
+## 项目结构
+
+```
+cmd/apiserver/              程序入口（配置加载、依赖装配、优雅关闭）
+internal/apiserver/
+  ├── controller/           HTTP 入参/出参
+  ├── service/              业务逻辑
+  ├── store/                数据访问（postgres 实现）
+  ├── model/                数据模型
+  └── options/              配置项与校验
+internal/pkg/               项目内通用能力
+  ├── authz/                Casbin 封装
+  ├── middleware/           Auth / Authz / 限流 / CORS 等中间件
+  ├── revoke/               JWT 吊销（Redis）
+  ├── loginlock/            登录失败锁定
+  ├── ratelimit/            限流
+  └── password/             密码策略
+pkg/                        可复用基础包（token / log / auth / ws）
+configs/                    配置文件与 Casbin 模型
+docs/                       开发规范、设计文档、版本策略
+scripts/                    初始化脚本
+```
+
+## 文档
+
+- [开发规范 CONVENTIONS.md](docs/CONVENTIONS.md) — 分层、错误码、日志、测试等工程约定
+- [JWT 与权限流转笔记](docs/notes/jwt-authz-flow.md) — 令牌流转、吊销、Casbin 数据
+- [变更记录 CHANGELOG.md](CHANGELOG.md)
+- [版本策略 VERSIONING.md](docs/VERSIONING.md)
+
+## 路线图（上生产前建议补齐）
+
+- [ ] 反向代理可信网段（`SetTrustedProxies`），否则 IP 限流/登录锁可被 `X-Forwarded-For` 绕过
+- [ ] 版本化数据库迁移工具替代 `init.sql`
+- [ ] 真实就绪探针（探测 DB / Redis）
+- [ ] 指标与链路追踪（Prometheus / OpenTelemetry）
+- [ ] 审计日志
 
 ## 许可证
 
 MIT License
+
+## 参考
+
+- [marmotedu/iam](https://github.com/marmotedu/iam) — 架构设计参考

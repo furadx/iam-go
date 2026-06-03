@@ -15,25 +15,25 @@ func init() {
 
 // Options 日志配置选项。
 type Options struct {
-	Level            string // 日志级别：debug, info, warn, error
-	Format           string // 日志格式：json, console
-	EnableColor      bool   // 是否启用颜色（仅 console 格式）
-	DisableCaller    bool   // 是否禁用调用者信息
-	DisableStacktrace bool   // 是否禁用堆栈跟踪
-	OutputPaths      []string // 输出路径
-	ErrorOutputPaths []string // 错误输出路径
+	Level             string   // 日志级别：debug, info, warn, error
+	Format            string   // 日志格式：json, console
+	EnableColor       bool     // 是否启用颜色（仅 console 格式）
+	DisableCaller     bool     // 是否禁用调用者信息
+	DisableStacktrace bool     // 是否禁用堆栈跟踪
+	OutputPaths       []string // 输出路径
+	ErrorOutputPaths  []string // 错误输出路径
 }
 
 // NewOptions 创建默认日志选项。
 func NewOptions() *Options {
 	return &Options{
-		Level:            "info",
-		Format:           "console",
-		EnableColor:      true,
-		DisableCaller:    false,
+		Level:             "info",
+		Format:            "console",
+		EnableColor:       true,
+		DisableCaller:     false,
 		DisableStacktrace: false,
-		OutputPaths:      []string{"stdout"},
-		ErrorOutputPaths: []string{"stderr"},
+		OutputPaths:       []string{"stdout"},
+		ErrorOutputPaths:  []string{"stderr"},
 	}
 }
 

@@ -69,8 +69,14 @@ func Auth(tm *token.Manager, rv revoke.Revoker, failOpen bool) gin.HandlerFunc {
 }
 
 func abortWithCode(c *gin.Context, status, bizCode int) {
-	c.AbortWithStatusJSON(status, gin.H{
+	body := gin.H{
 		"code":    bizCode,
 		"message": code.Text(bizCode),
-	})
+	}
+	if requestID, ok := c.Get(XRequestIDKey); ok {
+		if rid, ok := requestID.(string); ok && rid != "" {
+			body["request_id"] = rid
+		}
+	}
+	c.AbortWithStatusJSON(status, body)
 }
