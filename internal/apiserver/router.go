@@ -3,10 +3,13 @@ package apiserver
 import (
 	"github.com/gin-gonic/gin"
 
+	authzctrl "github.com/furadx/iam-go/internal/apiserver/controller/v1/authz"
 	"github.com/furadx/iam-go/internal/apiserver/controller/v1/user"
 	wsctrl "github.com/furadx/iam-go/internal/apiserver/controller/v1/ws"
 	"github.com/furadx/iam-go/internal/apiserver/store"
+	authzpkg "github.com/furadx/iam-go/internal/pkg/authz"
 	"github.com/furadx/iam-go/internal/pkg/middleware"
+	"github.com/furadx/iam-go/internal/pkg/revoke"
 	"github.com/furadx/iam-go/pkg/token"
 	"github.com/furadx/iam-go/pkg/ws"
 )
@@ -17,53 +20,68 @@ var (
 )
 
 func init() {
-	// 初始化 WebSocket Hub
 	Hub = ws.NewHub()
 }
 
+// RouterDeps 路由装配所需依赖。
+type RouterDeps struct {
+	Store          store.Factory
+	Token          *token.Manager
+	Revoker        revoke.Revoker
+	Authz          *authzpkg.Manager
+	RevokeFailOpen bool
+}
+
 // InitRouter 初始化路由。
-func InitRouter(store store.Factory, tm *token.Manager) *gin.Engine {
+func InitRouter(deps RouterDeps) *gin.Engine {
 	r := gin.New()
-
-	// 全局中间件
 	installMiddleware(r)
-
-	// 健康检查
 	r.GET("/healthz", healthCheck)
-
-	// 注册路由
-	installRoutes(r, store, tm)
-
+	installRoutes(r, deps)
 	return r
 }
 
-// healthCheck 健康检查处理器。
 func healthCheck(c *gin.Context) {
 	c.JSON(200, gin.H{"status": "ok"})
 }
 
-// installRoutes 注册 API 路由。
-func installRoutes(r *gin.Engine, store store.Factory, tm *token.Manager) {
-	// 初始化控制器
-	userController := user.NewUserController(store, tm)
+func installRoutes(r *gin.Engine, deps RouterDeps) {
+	userController := user.NewUserController(deps.Store, deps.Token, deps.Revoker, deps.Authz)
 	wsController := wsctrl.NewController(Hub)
+	authzController := authzctrl.NewController(deps.Authz)
 
-	// v1 API 路由组
+	auth := middleware.Auth(deps.Token, deps.Revoker, deps.RevokeFailOpen)
+	authz := middleware.Authz(deps.Authz)
+
 	v1 := r.Group("/api/v1")
 	{
-		// 登录，签发 JWT
+		// 公开接口
 		v1.POST("/login", userController.Login)
+		v1.POST("/refresh", userController.Refresh)
+		v1.POST("/users", userController.Create) // 注册（公开）
 
-		// 用户相关接口
-		users := v1.Group("/users")
+		// 需登录（仅认证）
+		authed := v1.Group("")
+		authed.Use(auth)
 		{
-			users.POST("", userController.Create)
-			users.GET("", userController.List)
-			users.GET("/:name", userController.Get)
-		}
+			authed.POST("/logout", userController.Logout)
+			authed.GET("/ws", wsController.HandleWebSocket)
 
-		// WebSocket 连接（需要 JWT 认证）
-		v1.GET("/ws", middleware.Auth(tm), wsController.HandleWebSocket)
+			// 需授权（Casbin；默认仅 admin 有策略）
+			protected := authed.Group("")
+			protected.Use(authz)
+			{
+				protected.GET("/users", userController.List)
+				protected.GET("/users/:name", userController.Get)
+				protected.POST("/users/:name/roles", authzController.AssignRole)
+				protected.DELETE("/users/:name/roles/:role", authzController.RevokeRole)
+				protected.GET("/users/:name/roles", authzController.ListRoles)
+
+				protected.POST("/authz/policies", authzController.AddPolicy)
+				protected.DELETE("/authz/policies", authzController.RemovePolicy)
+				protected.GET("/authz/policies", authzController.ListPolicies)
+			}
+		}
 	}
 }
 
