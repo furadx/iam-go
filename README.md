@@ -163,39 +163,59 @@ curl http://localhost:8080/api/v1/users/testuser
 }
 ```
 
-## 认证（JWT）
+## 认证与授权
 
-需要登录态的接口（如 WebSocket）使用 JWT 鉴权，流程如下：
+### JWT 双令牌
 
-**1. 登录获取 Token：**
-
+**登录**（公开）：
 ```bash
 curl -X POST http://localhost:8080/api/v1/login \
   -H "Content-Type: application/json" \
-  -d '{"name": "testuser", "password": "your-password"}'
+  -d '{"name":"alice","password":"your-password"}'
+# 返回 { access_token, refresh_token, expires_in, user }
 ```
 
-**响应：**
-```json
-{
-  "code": 0,
-  "message": "OK",
-  "data": {
-    "token": "eyJhbGciOiJIUzI1NiIs...",
-    "user": { "id": 1, "name": "testuser", ... }
-  }
-}
-```
+**访问受保护接口**：请求头带 `Authorization: Bearer <access_token>`。
 
-**2. 携带 Token 访问受保护接口：**
-
+**刷新**（access 过期后用 refresh 换新，旧 refresh 失效）：
 ```bash
-curl http://localhost:8080/api/v1/ws \
-  -H "Authorization: Bearer <token>"
+curl -X POST http://localhost:8080/api/v1/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token":"<refresh_token>"}'
 ```
 
-签名密钥与有效期通过 `configs/config.yaml` 的 `jwt` 段配置（生产环境务必修改 `jwt.secret`）。
-Token 校验逻辑见 `pkg/token`，中间件见 `internal/pkg/middleware/auth.go`。
+**登出**（吊销当前令牌，需登录）：
+```bash
+curl -X POST http://localhost:8080/api/v1/logout \
+  -H "Authorization: Bearer <access_token>" \
+  -d '{"refresh_token":"<refresh_token>"}'
+```
+
+吊销基于 Redis（`redis` 配置段）。`jwt.revoke_fail_open=true` 时 Redis 故障会放行并记日志。
+Token 校验见 `pkg/token`，认证中间件见 `internal/pkg/middleware/auth.go`。
+
+### RBAC（Casbin）
+
+API 级鉴权：策略 `(角色, 路径, 方法)`，分组 `(用户, 角色)`，存于 Postgres 的 `casbin_rule` 表。
+启动时默认 seed 一条 `admin → /api/v1/* → *`，新用户自动获得 `user` 角色。
+
+**设首个管理员**（注册后执行一次）：
+```sql
+INSERT INTO casbin_rule (ptype, v0, v1) VALUES ('g', 'alice', 'admin');
+```
+
+**管理接口**（仅 admin）：
+```bash
+# 增加策略
+curl -X POST http://localhost:8080/api/v1/authz/policies \
+  -H "Authorization: Bearer <admin-access>" \
+  -d '{"role":"editor","path":"/api/v1/users","method":"GET"}'
+
+# 给用户分配角色
+curl -X POST http://localhost:8080/api/v1/users/bob/roles \
+  -H "Authorization: Bearer <admin-access>" \
+  -d '{"role":"editor"}'
+```
 
 ## 错误码
 
@@ -210,10 +230,13 @@ Token 校验逻辑见 `pkg/token`，中间件见 `internal/pkg/middleware/auth.g
 | 100203 | Token 无效 |
 | 100204 | Token 已过期 |
 | 100205 | 未授权 |
+| 100206 | Token 类型错误 |
+| 100207 | RefreshToken 无效 |
 | 110001 | 用户不存在 |
 | 110002 | 用户已存在 |
 | 110003 | 密码错误 |
 | 110006 | 用户已被禁用 |
+| 110007 | 权限不足 |
 
 ## 配置
 
